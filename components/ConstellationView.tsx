@@ -5,7 +5,7 @@ import { Achievement, Category, getStarColor, getStarGlowIntensity } from '@/typ
 import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const VIEW_HEIGHT = 280;
+const VIEW_HEIGHT = 380;
 const PADDING = 40;
 
 interface StarPosition {
@@ -99,8 +99,16 @@ export function ConstellationView({ category, achievements, onStarPress }: Const
         {positions.map((pos) => {
           const glowIntensity = getStarGlowIntensity(pos.achievement.completionCount);
           const starColor = getStarColor(pos.achievement.completionCount);
-          const baseSize = 8;
-          const glowSize = baseSize + glowIntensity * 12;
+          // 모든 별은 동일한 크기 유지
+          // 카테고리 내 별 개수에 따라 크기 조정
+          const starCount = positions.length;
+          let baseSizeByCount = 10; // 1~6개
+          if (starCount >= 7 && starCount <= 15) {
+            baseSizeByCount = 8; // 7~15개
+          } else if (starCount > 15) {
+            baseSizeByCount = 6; // 16개 이상
+          }
+          const glowSize = baseSizeByCount + glowIntensity * 12;
 
           return (
             <React.Fragment key={pos.achievement.id}>
@@ -116,7 +124,7 @@ export function ConstellationView({ category, achievements, onStarPress }: Const
               <Circle
                 cx={pos.x}
                 cy={pos.y}
-                r={baseSize}
+                r={baseSizeByCount}
                 fill={starColor}
                 opacity={0.9}
               />
