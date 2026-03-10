@@ -38,10 +38,14 @@ export function useAchievements() {
 
   const saveData = useCallback(async (newData: AppData) => {
     try {
+      console.log('[LOG] saveData 시작:', newData.achievements.length, '개 별');
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      console.log('[LOG] AsyncStorage 저장 완료');
       setData(newData);
+      console.log('[LOG] setData 완료, 상태 업데이트됨');
     } catch (e) {
       console.error('Failed to save data:', e);
+      throw e;
     }
   }, []);
 
@@ -115,11 +119,18 @@ export function useAchievements() {
 
   const deleteAchievement = useCallback(
     async (id: string) => {
-      const newData = {
-        ...data,
-        achievements: data.achievements.filter((a) => a.id !== id),
-      };
-      await saveData(newData);
+      try {
+        const deletedTitle = data.achievements.find((a) => a.id === id)?.title || 'Unknown';
+        const newData = {
+          ...data,
+          achievements: data.achievements.filter((a) => a.id !== id),
+        };
+        await saveData(newData);
+        console.log('[LOG] 별 삭제 완료:', deletedTitle, '남은 별:', newData.achievements.length);
+      } catch (error) {
+        console.error('Error in deleteAchievement:', error);
+        throw error;
+      }
     },
     [data, saveData]
   );
@@ -164,6 +175,33 @@ export function useAchievements() {
     [data.achievements]
   );
 
+  const updateAchievementTitle = useCallback(
+    async (id: string, newTitle: string) => {
+      const newData = {
+        ...data,
+        achievements: data.achievements.map((a) =>
+          a.id === id ? { ...a, title: newTitle } : a
+        ),
+      };
+      await saveData(newData);
+    },
+    [data, saveData]
+  );
+
+  const reorderAchievements = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      const newAchievements = [...data.achievements];
+      const [movedItem] = newAchievements.splice(fromIndex, 1);
+      newAchievements.splice(toIndex, 0, movedItem);
+      const newData = {
+        ...data,
+        achievements: newAchievements,
+      };
+      await saveData(newData);
+    },
+    [data, saveData]
+  );
+
   const totalCompletions = data.achievements.reduce((sum, a) => sum + a.completionCount, 0);
   const totalAchievements = data.achievements.length;
 
@@ -175,10 +213,12 @@ export function useAchievements() {
     completeAchievement,
     uncompleteAchievement,
     deleteAchievement,
+    updateAchievementTitle,
     addCategory,
     getAchievementsByCategory,
     getCategoryById,
     getAchievementById,
+    reorderAchievements,
     totalCompletions,
     totalAchievements,
     reload: loadData,

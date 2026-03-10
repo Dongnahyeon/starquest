@@ -28,7 +28,7 @@ export default function ListDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { getCategoryById } = useAchievementsContext();
-  const { getListById, addListItem, toggleListItem, deleteListItem, deleteList, reorderListItems } = useListsContext();
+  const { getListById, addListItem, toggleListItem, deleteListItem, deleteList, reorderListItems, updateListItemTitle, updateListItemNote } = useListsContext();
 
   const list = getListById(id);
   const category = list ? getCategoryById(list.categoryId) : null;
@@ -146,6 +146,20 @@ export default function ListDetailScreen() {
     setShowItemNoteModal(true);
   };
 
+  const handleEditNote = async () => {
+    if (!list || !selectedItemId) return;
+    try {
+      await updateListItemNote(list.id, selectedItemId, selectedItemNote);
+      setShowItemNoteModal(false);
+      if (Platform.OS !== 'web') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (error) {
+      console.error('Update note error:', error);
+      Alert.alert('오류', '메모 수정에 실패했습니다.');
+    }
+  };
+
   const handleDeleteItem = (itemId: string, itemTitle: string) => {
     Alert.alert('항목 삭제', `"${itemTitle}" 항목을 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
@@ -153,8 +167,16 @@ export default function ListDetailScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          if (list) {
-            await deleteListItem(list.id, itemId);
+          try {
+            if (list) {
+              await deleteListItem(list.id, itemId);
+              if (Platform.OS !== 'web') {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }
+          } catch (error) {
+            console.error('Delete error:', error);
+            Alert.alert('오류', '항목 삭제에 실패했습니다.');
           }
         },
       },
@@ -185,6 +207,34 @@ export default function ListDetailScreen() {
     }
 
     setDraggedItemId(null);
+  };
+
+  const handleEditItem = (itemId: string, currentTitle: string) => {
+    Alert.prompt(
+      '항목 수정',
+      `"${currentTitle}" 항목의 이름을 변경하세요.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '수정',
+          onPress: async (text: string | undefined) => {
+            if (text && text.trim() && list) {
+              try {
+                await updateListItemTitle(list.id, itemId, text.trim());
+                if (Platform.OS !== 'web') {
+                  await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              } catch (error) {
+                console.error('Update failed:', error);
+                Alert.alert('오류', '항목 수정에 실패했습니다.');
+              }
+            }
+          },
+        },
+      ],
+      'plain-text',
+      currentTitle
+    );
   };
 
   const handleDeleteList = () => {
@@ -424,6 +474,11 @@ export default function ListDetailScreen() {
                 생성: {new Date(item.createdAt).toLocaleString('ko-KR')}
                 {item.completedAt && `\n완수: ${new Date(item.completedAt).toLocaleString('ko-KR')}`}
               </Text>
+              {item.completionNote && (
+                <Text style={styles.itemNote}>
+                  메모: {item.completionNote}
+                </Text>
+              )}
             </View>
 
             <View style={styles.itemActions}>
@@ -436,6 +491,14 @@ export default function ListDetailScreen() {
                   <IconSymbol name="note.text" size={16} color="#A0AEC0" />
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.deleteItemButton}
+                onPress={() => handleEditItem(item.id, item.title)}
+                activeOpacity={0.7}
+              >
+                <IconSymbol name="pencil" size={16} color="#718096" />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.deleteItemButton}
@@ -516,16 +579,31 @@ export default function ListDetailScreen() {
             <Text style={styles.modalTitle}>{selectedItemTitle}</Text>
             <Text style={styles.modalSubtitle}>메모</Text>
             
-            <View style={styles.noteViewBox}>
-              <Text style={styles.noteViewText}>{selectedItemNote}</Text>
-            </View>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="메모를 입력하세요"
+              placeholderTextColor="#718096"
+              value={selectedItemNote}
+              onChangeText={setSelectedItemNote}
+              multiline
+              numberOfLines={4}
+            />
             
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowItemNoteModal(false)}
-            >
-              <Text style={styles.modalCloseButtonText}>닫기</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowItemNoteModal(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>닫기</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={handleEditNote}
+              >
+                <Text style={styles.modalSaveButtonText}>저장</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -750,6 +828,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#718096',
     lineHeight: 16,
+  },
+  itemNote: {
+    fontSize: 11,
+    color: '#A0AEC0',
+    lineHeight: 16,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   itemActions: {
     flexDirection: 'row',
